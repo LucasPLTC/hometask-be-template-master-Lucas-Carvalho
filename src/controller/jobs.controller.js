@@ -22,18 +22,23 @@ const getUnpaidJobs = async (req, res) => {
 const payJob = async (req, res) => {
     try {
         const response = await JobsService.payJob(req);
-        if (response === '') {
-            res.status(httpStatus.NOT_FOUND).json({ message: `Job not found` });
 
-        } else if (typeof response === 'string' && response.includes('No paid found for this job')) {
-            res.status(httpStatus.CONFLICT).json({ message: `No paid found for this job` });
-
-        } else {
+        if (response.result){
             res.status(httpStatus.OK).json({ message: response });
-        }
+        } else {
+            if (response.message === 'The job was not found') {
+                res.status(httpStatus.NOT_FOUND).json({message: `The job was not found`});
 
+            } else if (typeof response.message === 'string' && response.message.includes('Contractor Profiles cannot pay jobs')) {
+                res.status(httpStatus.CONFLICT).json({message: response.message});
+            } else if (typeof response.message === 'string' && response.message.includes('failed. Please try again.')) {
+                res.status(httpStatus.INTERNAL_SERVER_ERROR).json({message: response.message});
+
+            } else if (typeof response.message === 'string' && response.message.includes('The client balance is not enough to pay')) {
+                res.status(httpStatus.BAD_REQUEST).json({message: response.message});
+            }
+        }
     } catch (error) {
-        console.log(error)
         res
             .status(httpStatus.INTERNAL_SERVER_ERROR)
             .json({ message: 'Error occurred while paying for a job', error });
