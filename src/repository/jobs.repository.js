@@ -37,6 +37,31 @@ const findJob = async (jobId,clientId) => {
     });
 };
 
+const findTotalJobsToPay = async (cliendId,depositTransaction) => {
+    return await Job.findAll(
+        {
+            attributes: {
+                include: [[sequelize.fn('SUM', sequelize.col('price')), 'totalPrice']],
+            },
+            include: [
+                {
+                    attributes: [],
+                    model: Contract,
+                    required: true,
+                    where: {
+                        ClientId: cliendId,
+                        status: 'in_progress',
+                    },
+                },
+            ],
+            where: {
+                paid: null,
+            },
+        },
+        { transaction: depositTransaction },
+    );
+}
+
 const payJob = async (id, contractorId, jobId, amountToBePaid) => {
     const paymentTransaction = await sequelize.transaction();
     try {
@@ -70,4 +95,4 @@ const payJob = async (id, contractorId, jobId, amountToBePaid) => {
     }
 };
 
-module.exports = { getUnpaidJobs, findJob , payJob };
+module.exports = { getUnpaidJobs, findJob, payJob, findTotalJobsToPay };
