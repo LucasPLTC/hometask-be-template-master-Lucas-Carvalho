@@ -10,7 +10,7 @@ const findByContractIdAndProfileId = async (contractId, profileId) => {
   });
 };
 
-const getNonTerminatedUserContracts = async (contractId, profileId) => {
+const getNonTerminatedUserContracts = async (profileId) => {
   return await Contract.findAll({
     where: {
       [Op.or]: [{ContractorId: profileId}, {ClientId: profileId}],
@@ -20,6 +20,5 @@ const getNonTerminatedUserContracts = async (contractId, profileId) => {
     },
   });
 };
-
 
 module.exports = { findByContractIdAndProfileId, getNonTerminatedUserContracts };

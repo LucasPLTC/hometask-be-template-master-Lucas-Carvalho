@@ -1,5 +1,4 @@
 const httpStatus = require('http-status');
-
 const ContractService = require('../service/contract.service');
 
 const getContractById = async (req, res) => {
@@ -20,7 +19,7 @@ const getContractById = async (req, res) => {
 const getNonTerminatedUserContracts = async (req, res) => {
   try {
     const contracts = await ContractService.getNonTerminatedUserContracts(req);
-    if (!contracts) {
+    if (!contracts ) {
       res.sendStatus(httpStatus.NOT_FOUND);
     } else {
       res
