@@ -1,0 +1,29 @@
+.DS_STORE
+database.sqlite3
+*.log
+npm-debug.log*
+
+# Dependency directories
+node_modules
+
+# Optional npm cache directory
+.npm
+
+# Build folder
+dist/
+
+# Reporters
+reports/
+
+# IDE files
+.idea
+*.iml
+out
+gen
+.vscode
+
+# logs folder
+dist-docs/
+
+/package-lock.json
+/yarn.lock
