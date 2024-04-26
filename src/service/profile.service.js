@@ -4,14 +4,14 @@ const {logger} = require("../core/Logger");
 
 class ProfileService  {
   constructor(ProfileRepository,JobsRepository) {
-    this.profileRepository = JobsRepository;
+    this.profileRepository = ProfileRepository;
     this.jobsRepository = JobsRepository;
     this.deposit = this.deposit.bind(this);
 
   }
 
   async deposit(req) {
-    const depositTransaction = await this.profileRepository.createTransaction();
+    const depositTransaction = await this.profileRepository.createTransaction(req);
     try{
       const clientId = UtilsService.validateParam(req.params.userId);
       const depositAmount = UtilsService.validateParam(req.body.amount);
