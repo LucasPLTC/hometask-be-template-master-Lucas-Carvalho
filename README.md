@@ -2,7 +2,7 @@
 - I would finish the implementation of unit tests that are not completely structured
 - Following pattern 3 of the 12 factors, I would implement the environment variables to be retrieved and stored in the environment variables of the system on which the application will run, and possibly have a third application exclusively dedicated to this periodically feed these values to make the maintenance of the environment's infrastructure dynamic without impacting the customer, in addition to being able to use feature flags to activate or deactivate functionalities
 - I would use NoSql Databases to make any request be translated into events distributed throughout the system, having an external application exclusively responsible for persisting critical data in the relational base from these events, taking responsibility away from this application.
-- 
+- There`s a bug that i didn`t solve, i tried for hours, and i would fix it if i had more time. "Cannot read properties of undefined (reading 'serialize')"
 
 
 # DEEL BACKEND TASK

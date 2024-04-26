@@ -8,13 +8,13 @@ const {APIError, HTTP404Error} = require("../core/BaseError");
 class JobsRepository extends BaseRepository {
     constructor() {
         super();
-        this.model = Job;
+        this.job = Job;
         this.sequelize = sequelize;
     }
 
     async getUnpaidJobs(profileId,transaction) {
         try {
-            return await this.model.findAll({
+            return await this.job.findAll({
                 include: [
                     {
                         attributes: [],
@@ -51,29 +51,43 @@ class JobsRepository extends BaseRepository {
 
     async findJobToPay(jobId, clientId,transaction) {
         try {
-            const result = await this.model.findOne({
-                where: {id: jobId, paid: {[Op.is]: false}},
+            const result = await this.job.findAll({
+                where: {id: jobId},
                 include: [
                     {
                         model: Contract,
-                        where: {status: 'in_progress', ClientId: clientId},
+                        where: {ClientId: clientId},
                     }
                 ],
                 transaction: transaction
             });
             if(result === undefined){
-                throw new HTTP404Error("Nenhum registro encontrado");
+                throw new HTTP404Error("Job not found");
             }
             return result
 
         } catch (error) {
             await logger.error(error.name, error.message);
-
             await logger.trace(error.stack, error);
-
             throw new APIError(error.name,error.message);
         }
     }
+
+    // async findJobToPay(jobId, clientId,transaction) {
+    //     try {
+    //         const job = await this.job.findByPk(jobId, { transaction });
+    //         if (!job || job.paid) throw new HTTP400Error('Job not found or already paid.');
+    //
+    //         const contract = await Contract.findByPk(job.ContractId, { transaction });
+    //         if (!contract || contract.status !== 'in_progress') throw new HTTP404Error('Contract not found or not active.');
+    //
+    //         return { job, contract };
+    //     } catch (error) {
+    //         await logger.error(error.name, error.message);
+    //         await logger.trace(error.stack, error);
+    //         throw new APIError(error.name,error.message);
+    //     }
+    // }
 
     async findTotalJobsToPay(cliendId, transaction) {
         try {
@@ -95,7 +109,7 @@ class JobsRepository extends BaseRepository {
                         },
                     ],
                     where: {
-                        paid: null,
+                        paid: false,
                     },
                 },
                 {transaction: transaction},
@@ -112,7 +126,7 @@ class JobsRepository extends BaseRepository {
 
     async payJob(jobId, transaction) {
         try {
-            return await this.model.update(
+            return await this.job.update(
                 {paid: 1, paymentDate: new Date()},
                 {where: {id: jobId}},
                 {transaction: transaction},

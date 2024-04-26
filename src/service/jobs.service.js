@@ -33,8 +33,8 @@ class JobsService {
 
       await this.validateClientType(type);
 
-      const job = await this.jobsRepository.findJobToPay(jobId, id, transaction);
-      await this.validateJobToPay(job);
+      const { job, contract } = await this.jobsRepository.findJobToPay(jobId, id, transaction);;
+      await this.validateJobToPay(job,contract,profileId);
 
       await this.validateClientBalanceToPay(job, balance)
 
@@ -56,10 +56,12 @@ class JobsService {
     }
   }
 
-  async validateJobToPay(job) {
+  async validateJobToPay(job,contract,profileId) {
     if (!job) {
-      throw new HTTP404Error('Job not found')
+      throw new HTTP404Error('Job not found or already paid')
     }
+
+    if (contract.ClientId !== profileId) throw new Error('Not authorized to pay for this job.');
   }
 
   async validateClientBalanceToPay(job,balance) {

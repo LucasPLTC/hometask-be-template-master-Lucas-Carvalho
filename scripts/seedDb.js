@@ -148,12 +148,12 @@ async function seed() {
       ContractId: 2,
     }),
     Job.create({
-      description: 'work',
+      description: 'in_progress',
       price: 202,
       ContractId: 3,
     }),
     Job.create({
-      description: 'work',
+      description: 'in_progress',
       price: 200,
       ContractId: 4,
     }),

@@ -20,8 +20,9 @@ class ProfileService  {
       await this.validateResult(clientResult,"Client not Found");
 
       const totalJobsToPay = await this.jobsRepository.findTotalJobsToPay(clientId,depositTransaction);
-      await this.validateResult(totalJobsToPay,`There are no unpaid jobs for client ${clientId}.`);
-      const { totalPrice } = totalJobsToPay[0].dataValues;
+      await this.validateResult(totalJobsToPay[0],`There are no unpaid jobs for client ${clientId}.`);
+      console.log(totalJobsToPay[0].dataValues)
+      const { totalPrice } = totalJobsToPay[0].dataValues.price;
 
       if (this.validateDepositAmountOverThreshold(depositAmount, totalPrice)){
         throw new HTTP400Error(`Deposit of ${depositAmount} is more than 25% of client ${clientId} total of jobs to pay, Maximum deposit amount reached.`);

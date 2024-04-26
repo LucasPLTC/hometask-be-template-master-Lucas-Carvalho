@@ -12,15 +12,15 @@ class BaseRepository {
         return await sequelize.transaction();
     }
 
-    async commitTransaction(depositTransaction) {
-        if (depositTransaction) {
-            await depositTransaction.commit();
+    async commitTransaction(transaction) {
+        if (transaction) {
+            await transaction.commit();
         }
     }
 
-    async rollbackTransaction(depositTransaction) {
-        if (depositTransaction) {
-            await depositTransaction.rollback();
+    async rollbackTransaction(transaction) {
+        if (transaction) {
+            await transaction.rollback();
         }
     }
 }
