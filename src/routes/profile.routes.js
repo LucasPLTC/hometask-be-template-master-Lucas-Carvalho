@@ -1,9 +1,11 @@
 const express = require('express');
 
-const { deposit } = require('../controller/profile.controller');
+const { getProfile } = require('../middleware/getProfile');
 
-const profileRoutes = express.Router();
+module.exports = function({ profileController }) {
+  const profileRoutes = express.Router();
 
-profileRoutes.post('/deposit/:userId', deposit);
+profileRoutes.post('/deposit/:userId',getProfile ,profileController.deposit);
 
-module.exports = profileRoutes;
+  return profileRoutes;
+};

@@ -1,24 +1,58 @@
+const {HttpStatusCode} = require("../core/HttpEnums.js");
+const { logger } = require('../core/Logger');
+
 const { Op } = require('sequelize');
-const {Contract} = require("../model");
+const { Contract, sequelize } = require("../model.js");
+const { APIError} = require('../core/BaseError')
+const BaseRepository = require("./base.repository.js");
 
-const findByContractIdAndProfileId = async (contractId, profileId) => {
-  return await Contract.findOne({
-    where: {
-      id: contractId,
-      [Op.or]: [{ContractorId: profileId}, {ClientId: profileId}],
-    },
-  });
-};
+class ContractRepository extends BaseRepository {
+  constructor() {
+    super();
+    this.contract = Contract;
+    this.sequelize = sequelize;
+  }
 
-const getNonTerminatedUserContracts = async (profileId) => {
-  return await Contract.findAll({
-    where: {
-      [Op.or]: [{ContractorId: profileId}, {ClientId: profileId}],
-      status: {
-        [Op.ne]: 'terminated',
+  async findByContractIdAndProfileId(contractId, profileId,transaction) {
+    try{    return await this.contract.findOne({
+      where: {
+        id: contractId,
+        [Op.or]: [{ContractorId: profileId}, {ClientId: profileId}],
+
       },
-    },
-  });
-};
+      transaction: transaction
+    });
+    }catch (error){
+      await logger.error(error.name, error.message);
 
-module.exports = { findByContractIdAndProfileId, getNonTerminatedUserContracts };
+      await logger.trace(error.stack, error);
+
+      throw new APIError(error.name,error.message);
+    }
+
+  }
+
+  async getNonTerminatedUserContracts(profileId,transaction) {
+    try{
+    return await this.contract.findAll({
+      where: {
+        [Op.or]: [{ContractorId: profileId}, {ClientId: profileId},],
+        status: {
+          [Op.ne]: 'terminated',
+
+        },
+      },
+      transaction: transaction
+
+    });
+  }catch (error){
+    await logger.error(error.name, error.message);
+
+    await logger.trace(error.stack, error);
+
+      throw new APIError(error.name,error.message);
+  }
+  }
+}
+
+module.exports = ContractRepository;

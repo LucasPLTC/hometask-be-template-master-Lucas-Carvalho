@@ -1,11 +1,12 @@
 const express = require('express');
-const { getBestProfession } = require('../controller/admin.controller');
-const {getBestClients} = require("../service/admin.service");
 
-const contractRouter = express.Router();
+const { getProfile } = require('../middleware/getProfile');
 
-contractRouter.get('/best-profession', getBestProfession);
+module.exports = function({ adminController }) {
+  const adminRouter = express.Router();
 
-contractRouter.get('/best-clients', getBestClients);
+  adminRouter.get('/best-profession',getProfile,  adminController.getBestProfession);
+  adminRouter.get('/best-clients',getProfile,  adminController.getBestClients);
 
-module.exports = contractRouter;
+  return adminRouter;
+};

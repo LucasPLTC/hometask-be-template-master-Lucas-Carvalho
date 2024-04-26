@@ -1,48 +1,91 @@
-const JobsRepository = require('../repository/jobs.repository');
+const { HTTP400Error, HTTP404Error }  = require("../core/BaseError.js");
+const UtilsService = require('../utils/utils');
+const {logger} = require("../core/Logger");
 
-const getUnpaidJobs = async (req) => {
-  const profileId = req.profile.id;
-  return await JobsRepository.getUnpaidJobs(profileId);
-};
+class JobsService {
+  constructor(JobsRepository,ProfileRepository) {
+    this.jobsRepository = JobsRepository;
+    this.profileRepository = ProfileRepository;
+    this.getUnpaidJobs = this.getUnpaidJobs.bind(this);
+    this.payJob = this.payJob.bind(this);
 
-const payJob = async (req) => {
-  const { id, balance, type } = req.profile;
-  const jobId = req.params.id;
-  let response = {
-    result: false,
-    message: ''
   }
 
-  if (type !== 'client'){
-    response.result = false;
-    response.message =  'Contractor Profiles cannot pay jobs';
-    return response;
-  }
+  async getUnpaidJobs(req) {
+    try {
+      const profileId = UtilsService.validateParam(req.profile.id);
+      const result = await this.jobsRepository.getUnpaidJobs(profileId, null);
 
-  const job = await JobsRepository.findJob(jobId, id);
-
-  if (job && type === 'client') {
-    const amountToBePaid = job.price;
-    const contractorId = job.Contract.ContractorId;
-    if (balance >= amountToBePaid) {
-      const result = await JobsRepository.payJob(id, contractorId, jobId, amountToBePaid);
-      const queryResponse = result ? `Payment of ${amountToBePaid} for ${job.description} has been made successfully.`
-          : `Payment of ${amountToBePaid} for ${job.description} failed. Please try again.`;
-      response.result = result;
-      response.message = queryResponse;
-
-    }else{
-      response.result = false;
-      response.message = 'The client balance is not enough to pay'
+      await UtilsService.validateResult(result);
+      return result;
+    } catch (error) {
+      await logger.error(error.name, error.message);
+      throw error;
     }
-  } else {
-    response.result = false;
-    response.message = `The job was not found`;
   }
-  return response;
-};
 
-module.exports = {
-  getUnpaidJobs,
-  payJob,
-};
+
+  async payJob(req) {
+    const transaction = this.jobsRepository.createTransaction(req)
+    try {
+      const {id, balance, type} = req.profile;
+      const jobId = UtilsService.validateParam(req.params.id);
+
+      await this.validateClientType(type);
+
+      const job = await this.jobsRepository.findJobToPay(jobId, id, transaction);
+      await this.validateJobToPay(job);
+
+      await this.validateClientBalanceToPay(job, balance)
+
+      const contractorId = job.Contract.ContractorId;
+      const amountToBePaid = job.price;
+
+      //transfers paid value between clients and pay
+      return await this.payJobAndTransferValue(id, amountToBePaid, contractorId, jobId, job, transaction);
+    } catch (error) {
+      await logger.error(error.name, error.message);
+      await this.jobsRepository.rollbackTransaction(transaction);
+      throw error;
+    }
+  }
+
+  async validateClientType(type) {
+    if (type !== 'client') {
+      throw new HTTP400Error('Contractor Profiles cannot pay jobs')
+    }
+  }
+
+  async validateJobToPay(job) {
+    if (!job) {
+      throw new HTTP404Error('Job not found')
+    }
+  }
+
+  async validateClientBalanceToPay(job,balance) {
+    const amountToBePaid = job.price;
+    if (balance <= amountToBePaid) {
+      throw new HTTP400Error('The client balance is not enough to pay')
+    }
+  }
+
+  async payJobAndTransferValue(id,amountToBePaid, contractorId, jobId, job, transaction) {
+    //subtract amount paid
+    const resultDecrese = await this.profileRepository.decreaseProfileBalance(id, amountToBePaid,transaction);
+
+    //add amount paid
+    const resultIncrease = await this.profileRepository.increaseProfileBalance(contractorId, amountToBePaid,transaction);
+
+    //payJob
+    const resultPayment = await this.jobsRepository.payJob(jobId, transaction);
+
+    if (resultDecrese === 0 || resultIncrease === 0 ||resultPayment === 0 ){
+      await this.jobsRepository.rollbackTransaction(transaction);
+      throw new HTTP400Error(`Payment of ${amountToBePaid} for ${job.description} failed. Please try again.`);
+    }
+
+    return `Payment of ${amountToBePaid} for ${job.description} has been made successfully.`;
+  }
+}
+
+module.exports = JobsService;

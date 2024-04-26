@@ -1,11 +1,12 @@
 const express = require('express');
 
-const { getUnpaidJobs, payJob } = require('../controller/jobs.controller');
 const { getProfile } = require('../middleware/getProfile');
 
-const jobRoutes = express.Router();
+module.exports = function({ jobsController }) {
+  const jobRoutes = express.Router();
 
-jobRoutes.get('/unpaid', getProfile, getUnpaidJobs);
-jobRoutes.post('/:id/pay', getProfile, payJob);
+jobRoutes.get('/unpaid', getProfile, jobsController.getUnpaidJobs);
+jobRoutes.post('/:id/pay', getProfile, jobsController.payJob);
 
-module.exports = jobRoutes;
+  return jobRoutes;
+};

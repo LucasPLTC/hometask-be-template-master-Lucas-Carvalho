@@ -1,60 +1,56 @@
-  const ProfileRepository = require('../repository/profile.repository');
-  const JobsRepository = require('../repository/jobs.repository');
-  const deposit = async (req) => {
-    const clientId = req.params.userId;
-    const depositAmount = req.body.amount;
+const { HTTP400Error, HTTP404Error }  = require("../core/BaseError.js");
+const UtilsService = require('../utils/utils');
+const {logger} = require("../core/Logger");
 
-    let response = {
-      result: false,
-      message: "",
-      payload:null
-    };
-
-    const depositTransaction = await ProfileRepository.createTransaction(req);
-
-    try{
-      const client = await ProfileRepository.findProfile(clientId,depositTransaction)
-      if (!client){
-        response.result = false
-        response.message = "Client not Found"
-        await ProfileRepository.rollbackTransaction();
-        return response;
-      }
-      const totalJobsToPay = await JobsRepository.findTotalJobsToPay(clientId,depositTransaction);
-
-      const { totalPrice } = totalJobsToPay[0].dataValues;
-      if (totalPrice == null) {
-        response.result = false;
-        response.message = `There are no unpaid jobs for client ${clientId}.`;
-        return response;
-      }
-
-      if (validateDepositAmountOverThreshold(depositAmount, totalPrice)){
-        response.message = `Deposit of ${depositAmount} is more than 25% of client ${clientId} total of jobs to pay, Maximum deposit amount reached.`;
-        response.result = false;
-        return response;
-      }
-
-      const clientUpdated = await ProfileRepository.deposit(client, depositAmount,depositTransaction);
-
-      await ProfileRepository.commitTransaction(depositTransaction);
-
-      response.result = true;
-      response.message = "Success"
-      response.payload = clientUpdated;
-      return response;
-
-    } catch (error) {
-      await ProfileRepository.rollbackTransaction(depositTransaction);
-    }
+class ProfileService  {
+  constructor(ProfileRepository,JobsRepository) {
+    this.profileRepository = JobsRepository;
+    this.jobsRepository = JobsRepository;
+    this.deposit = this.deposit.bind(this);
 
   }
 
-    const validateDepositAmountOverThreshold = function (depositAmount, totalprice){
-      const depositThreshold = totalprice * 1.25;
-      return depositAmount > depositThreshold;
+  async deposit(req) {
+    const depositTransaction = await this.profileRepository.createTransaction();
+    try{
+      const clientId = UtilsService.validateParam(req.params.userId);
+      const depositAmount = UtilsService.validateParam(req.body.amount);
+
+      const clientResult = await this.profileRepository.findProfile(clientId,depositTransaction)
+      await this.validateResult(clientResult,"Client not Found");
+
+      const totalJobsToPay = await this.jobsRepository.findTotalJobsToPay(clientId,depositTransaction);
+      await this.validateResult(totalJobsToPay,`There are no unpaid jobs for client ${clientId}.`);
+      const { totalPrice } = totalJobsToPay[0].dataValues;
+
+      if (this.validateDepositAmountOverThreshold(depositAmount, totalPrice)){
+        throw new HTTP400Error(`Deposit of ${depositAmount} is more than 25% of client ${clientId} total of jobs to pay, Maximum deposit amount reached.`);
+      }
+
+      const clientUpdated = await this.profileRepository.deposit(clientResult, depositAmount,depositTransaction);
+      await this.profileRepository.commitTransaction(depositTransaction);
+
+      await this.validateResult(clientUpdated);
+      return clientUpdated;
+    }catch (error){
+      await this.profileRepository.rollbackTransaction(depositTransaction);
+      await logger.error(error.name, error.message);
+      throw error;
+    }
+  }
+
+  async validateResult(result,errorMessage) {
+    if (result === null || (Array.isArray(result) && result.length === 0)) {
+      throw new HTTP404Error(errorMessage);
+    }
+    return result;
+  }
+
+   validateDepositAmountOverThreshold (depositAmount, totalprice){
+    const depositThreshold = totalprice * 1.25;
+    return depositAmount > depositThreshold;
   };
 
-  module.exports = {
-    deposit,
-  };
+}
+
+module.exports = ProfileService;

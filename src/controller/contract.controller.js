@@ -1,39 +1,31 @@
-const httpStatus = require('http-status');
-const ContractService = require('../service/contract.service');
+const HttpStatusCode = require('../core/HttpEnums');
 
-const getContractById = async (req, res) => {
-  try {
-    const contract = await ContractService.getContractById(req);
-    if (!contract) {
-      res.sendStatus(httpStatus.NOT_FOUND);
-    } else {
-      res.status(httpStatus.OK).json(contract);
+class ContractController {
+    constructor(ContractService) {
+        this.contractService = ContractService;
+        this.retrieveContractById = this.retrieveContractById.bind(this);
+        this.retrieveNonTerminatedUserContracts = this.retrieveNonTerminatedUserContracts.bind(this);
     }
-  } catch (error) {
-    res
-      .status(httpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error });
-  }
-};
 
-const getNonTerminatedUserContracts = async (req, res) => {
-  try {
-    const contracts = await ContractService.getNonTerminatedUserContracts(req);
-    if (!contracts ) {
-      res.sendStatus(httpStatus.NOT_FOUND);
-    } else {
-      res
-        .status(httpStatus.OK)
-        .json(contracts);
+    async retrieveContractById(req, res, next) {
+        const contract = await this.contractService.getContractById(req);
+        this.sendResponse(req, res, next, contract);
     }
-  } catch (error) {
-    res
-      .status(httpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error });
-  }
-};
 
-module.exports = {
-  getContractById,
-  getNonTerminatedUserContracts,
-};
+    async retrieveNonTerminatedUserContracts(req, res, next) {
+        const contracts = await this.contractService.getNonTerminatedUserContracts(req);
+        this.sendResponse(req, res, next, contracts);
+    }
+
+    async sendResponse(req, res, next, dataPromise) {
+        try {
+            const data = await dataPromise;
+            res.status(HttpStatusCode.OK).json(data);
+        } catch (error) {
+            res.status(error.httpCode || 500).json(error.description || 'Unexpected error occurred');
+            next(error);
+        }
+    }
+}
+
+module.exports = ContractController;

@@ -1,98 +1,130 @@
-const { Op} = require('sequelize');
-const {Job, Contract, sequelize, Profile} = require("../model");
 
-const getUnpaidJobs = async (profileId) => {
-    return await Job.findAll({
-        include: [
-            {
-                attributes: [],
-                model: Contract,
-                required: true,
+const {Op} = require('sequelize');
+const {Job, Contract, sequelize} = require("../model.js");
+const BaseRepository  = require("./base.repository.js");
+const {logger} = require("../core/Logger.js");
+const {APIError, HTTP404Error} = require("../core/BaseError");
+
+class JobsRepository extends BaseRepository {
+    constructor() {
+        super();
+        this.model = Job;
+        this.sequelize = sequelize;
+    }
+
+    async getUnpaidJobs(profileId,transaction) {
+        try {
+            return await this.model.findAll({
+                include: [
+                    {
+                        attributes: [],
+                        model: Contract,
+                        required: true,
+                        where: {
+                            [Op.or]: [{ContractorId: profileId}, {ClientId: profileId}],
+                            status: {
+                                [Op.eq]: 'in_progress',
+                            },
+
+                        },
+                        transaction: transaction
+                    },
+                ],
                 where: {
-                    [Op.or]: [{ContractorId: profileId}, {ClientId: profileId}],
-                    status: {
-                        [Op.eq]: 'in_progress',
-                    },
+                    [Op.or]: [
+                        {paid: false},
+                        {paid: null},
+                    ],
                 },
-            },
-        ],
-        where: {
-            [Op.or]: [
-                {paid: false},
-                {paid: null},
-            ],
-        },
-    });
-};
+                transaction: transaction
 
-const findJob = async (jobId,clientId) => {
-    return await Job.findOne({
-        where: { id: jobId, paid: { [Op.is]: null } },
-        include: [
-            {
-                model: Contract,
-                where: { status: 'in_progress', ClientId: clientId },
-            },
-        ],
-    });
-};
 
-const findTotalJobsToPay = async (cliendId,depositTransaction) => {
-    return await Job.findAll(
-        {
-            attributes: {
-                include: [[sequelize.fn('SUM', sequelize.col('price')), 'totalPrice']],
-            },
-            include: [
+            });
+        } catch (error) {
+            await logger.error(error.name, error.message);
+
+            await logger.trace(error.stack, error);
+
+            throw new APIError(error.name,error.message);
+        }
+    }
+
+    async findJobToPay(jobId, clientId,transaction) {
+        try {
+            const result = await this.model.findOne({
+                where: {id: jobId, paid: {[Op.is]: false}},
+                include: [
+                    {
+                        model: Contract,
+                        where: {status: 'in_progress', ClientId: clientId},
+                    }
+                ],
+                transaction: transaction
+            });
+            if(result === undefined){
+                throw new HTTP404Error("Nenhum registro encontrado");
+            }
+            return result
+
+        } catch (error) {
+            await logger.error(error.name, error.message);
+
+            await logger.trace(error.stack, error);
+
+            throw new APIError(error.name,error.message);
+        }
+    }
+
+    async findTotalJobsToPay(cliendId, transaction) {
+        try {
+            return await Job.findAll(
                 {
-                    attributes: [],
-                    model: Contract,
-                    required: true,
+                    attributes: {
+                        include: [[sequelize.fn('SUM', sequelize.col('price')), 'totalPrice']],
+                    },
+                    include: [
+                        {
+                            attributes: [],
+                            model: Contract,
+                            required: true,
+                            where: {
+                                ClientId: cliendId,
+                                status: 'in_progress',
+                            },
+                            transaction: transaction
+                        },
+                    ],
                     where: {
-                        ClientId: cliendId,
-                        status: 'in_progress',
+                        paid: null,
                     },
                 },
-            ],
-            where: {
-                paid: null,
-            },
-        },
-        { transaction: depositTransaction },
-    );
+                {transaction: transaction},
+            );
+        } catch (error) {
+            await logger.error(error.name, error.message);
+
+            await logger.trace(error.stack, error);
+
+            throw new APIError(error.name,error.message);
+        }
+
+    }
+
+    async payJob(jobId, transaction) {
+        try {
+            return await this.model.update(
+                {paid: 1, paymentDate: new Date()},
+                {where: {id: jobId}},
+                {transaction: transaction},
+            );
+        } catch (error) {
+            await logger.error(error.name, error.message);
+            await logger.trace(error.stack, error);
+            throw new APIError(error.name,error.message);
+        }
+    }
 }
 
-const payJob = async (id, contractorId, jobId, amountToBePaid) => {
-    const paymentTransaction = await sequelize.transaction();
-    try {
-        await Promise.all([
-            Profile.update(
-                { balance: sequelize.literal(`balance - ${amountToBePaid}`) },
-                { where: { id } },
-                { transaction: paymentTransaction },
-            ),
+module.exports = JobsRepository;
 
-            Profile.update(
-                { balance: sequelize.literal(`balance + ${amountToBePaid}`) },
-                { where: { id: contractorId } },
-                { transaction: paymentTransaction },
-            ),
 
-            Job.update(
-                { paid: 1, paymentDate: new Date() },
-                { where: { id: jobId } },
-                { transaction: paymentTransaction },
-            ),
-        ]);
-
-        await paymentTransaction.commit();
-
-        return true;
-    } catch (error) {
-        console.log(error);
-        await paymentTransaction.rollback();
-        return false;
-    }
-};
-
-module.exports = { getUnpaidJobs, findJob, payJob, findTotalJobsToPay };

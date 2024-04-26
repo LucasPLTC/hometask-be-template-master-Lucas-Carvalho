@@ -1,11 +1,12 @@
 const express = require('express');
 
-const { getContractById, getNonTerminatedUserContracts } = require('../controller/contract.controller');
 const { getProfile } = require('../middleware/getProfile');
 
-const contractRouter = express.Router();
+module.exports = function({ contractController }) {
+  const contractRouter = express.Router();
 
-contractRouter.get('/',getProfile, getNonTerminatedUserContracts);
-contractRouter.get('/:id', getProfile, getContractById);
+    contractRouter.get('/',getProfile, contractController.retrieveNonTerminatedUserContracts);
+    contractRouter.get('/:id', getProfile, contractController.retrieveContractById);
 
-module.exports = contractRouter;
+  return contractRouter;
+};

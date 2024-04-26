@@ -1,51 +1,43 @@
-const httpStatus = require('http-status');
+const HttpStatusCode = require('../core/HttpEnums');
 
-const JobsService = require('../service/jobs.service');
-
-const getUnpaidJobs = async (req, res) => {
-    try {
-        const unpaidJobs = await JobsService.getUnpaidJobs(req);
-        if (!unpaidJobs ) {
-            res.sendStatus(httpStatus.NOT_FOUND);
-        } else {
-            res
-                .status(httpStatus.OK)
-                .json(unpaidJobs);
-        }
-    } catch (error) {
-        res
-            .status(httpStatus.INTERNAL_SERVER_ERROR)
-            .json({ error });
+class JobsController {
+    constructor(JobsService) {
+        this.jobsService = JobsService;
+        this.getUnpaidJobs = this.getUnpaidJobs.bind(this);
+        this.payJob = this.payJob.bind(this);
     }
-};
 
-const payJob = async (req, res) => {
-    try {
-        const response = await JobsService.payJob(req);
-
-        if (response.result){
-            res.status(httpStatus.OK).json({ message: response });
-        } else {
-            if (response.message === 'The job was not found') {
-                res.status(httpStatus.NOT_FOUND).json({message: `The job was not found`});
-
-            } else if (typeof response.message === 'string' && response.message.includes('Contractor Profiles cannot pay jobs')) {
-                res.status(httpStatus.CONFLICT).json({message: response.message});
-            } else if (typeof response.message === 'string' && response.message.includes('failed. Please try again.')) {
-                res.status(httpStatus.INTERNAL_SERVER_ERROR).json({message: response.message});
-
-            } else if (typeof response.message === 'string' && response.message.includes('The client balance is not enough to pay')) {
-                res.status(httpStatus.BAD_REQUEST).json({message: response.message});
-            }
+    async getUnpaidJobs(req, res, next) {
+        try {
+            const unpaidJobs = await this.jobsService.getUnpaidJobs(req);
+            this.sendResponse(req, res, next, unpaidJobs);
+        } catch (error) {
+            res.status(error.httpCode || 500).json(error.description || 'Unexpected error occurred');
+            next(error);
         }
-    } catch (error) {
-        res
-            .status(httpStatus.INTERNAL_SERVER_ERROR)
-            .json({ message: 'Error occurred while paying for a job', error });
-    }
-};
 
-module.exports = {
-    getUnpaidJobs,
-    payJob,
-};
+    }
+
+    async payJob(req, res, next) {
+        try {
+            const response = await this.jobsService.payJob(req);
+            this.sendResponse(req, res, next, response);
+        } catch (error) {
+            res.status(error.httpCode || 500).json(error.description || 'Unexpected error occurred');
+            next(error);
+        }
+
+    }
+
+    async sendResponse(req, res, next, dataPromise) {
+        try {
+            const data = await dataPromise;
+            res.status(HttpStatusCode.OK).json(data);
+        } catch (error) {
+            res.status(error.httpCode || 500).json(error.description || 'Unexpected error occurred');
+            next(error);
+        }
+    }
+}
+
+module.exports = JobsController;
